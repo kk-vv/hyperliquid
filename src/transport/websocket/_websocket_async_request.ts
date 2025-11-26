@@ -1,6 +1,6 @@
 import { TransportError } from "../base.ts";
 import { Promise_ } from "../_polyfills.ts";
-import type { ReconnectingWebSocket } from "@nktkas/rews";
+import type { ReconnectingWebSocket } from "./_reconnecting_websocket.ts";
 import type { HyperliquidEventTarget } from "./_hyperliquid_event_target.ts";
 
 interface PostRequest {
@@ -29,7 +29,6 @@ export class WebSocketRequestError extends TransportError {
  * Handles request creation, sending, and mapping responses to their corresponding requests.
  */
 export class WebSocketAsyncRequest {
-  protected socket: ReconnectingWebSocket;
   protected lastId = 0;
   protected queue: {
     id: number | string;
@@ -46,21 +45,13 @@ export class WebSocketAsyncRequest {
    * @param socket - WebSocket connection instance for sending requests to the Hyperliquid WebSocket API
    * @param hlEvents - Used to recognize Hyperliquid responses and match them with sent requests
    */
-  constructor(socket: ReconnectingWebSocket, hlEvents: HyperliquidEventTarget) {
-    this.socket = socket;
-
+  constructor(protected socket: ReconnectingWebSocket, hlEvents: HyperliquidEventTarget) {
     // Monitor responses and match the pending request
     hlEvents.addEventListener("subscriptionResponse", (event) => {
       const id = WebSocketAsyncRequest.requestToId(event.detail);
       this.queue.find((x) => x.id === id)?.resolve(event.detail);
     });
     hlEvents.addEventListener("post", (event) => {
-      if (event.detail.response.type === "error") {
-        this.queue
-          .find((x) => x.id === event.detail.id)
-          ?.reject(new WebSocketRequestError(event.detail.response.payload));
-        return;
-      }
       const data = event.detail.response.type === "info"
         ? event.detail.response.payload.data
         : event.detail.response.payload;
@@ -157,8 +148,8 @@ export class WebSocketAsyncRequest {
     // Reject the request if the signal is aborted
     if (signal?.aborted) return Promise.reject(signal.reason);
     // or if the WebSocket connection is permanently closed
-    if (this.socket.terminationSignal.aborted) {
-      return Promise.reject(this.socket.terminationSignal.reason);
+    if (this.socket.terminateSignal.aborted) {
+      return Promise.reject(this.socket.terminateSignal.reason);
     }
 
     // Create a request
@@ -176,7 +167,7 @@ export class WebSocketAsyncRequest {
     }
 
     // Send the request
-    this.socket.send(JSON.stringify(request));
+    this.socket.send(JSON.stringify(request), signal);
     this.lastRequestTime = Date.now();
 
     // Wait for a response

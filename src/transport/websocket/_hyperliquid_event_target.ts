@@ -1,3 +1,4 @@
+import { TypedEventTarget } from "typescript-event-target";
 import * as v from "valibot";
 import { CustomEvent_ } from "../_polyfills.ts";
 
@@ -45,13 +46,6 @@ interface PostResponse {
           }
           | string;
       };
-    }
-    /** Response containing error message. */
-    | {
-      /** Indicates that this is an action response. */
-      type: "error";
-      /** Contains the error message, e.g. 429 Too Many Requests */
-      payload: string;
     };
 }
 
@@ -102,7 +96,7 @@ const ExplorerTxsEventSchema = /* @__PURE__ */ (() => {
 })();
 
 /** Listens for WebSocket messages and sends them as Hyperliquid typed events. */
-export class HyperliquidEventTarget extends EventTarget {
+export class HyperliquidEventTarget extends TypedEventTarget<HyperliquidEventMap> {
   constructor(socket: WebSocket) {
     super();
     socket.addEventListener("message", (event) => {
@@ -120,18 +114,4 @@ export class HyperliquidEventTarget extends EventTarget {
       }
     });
   }
-}
-
-export interface HyperliquidEventTarget {
-  addEventListener<K extends keyof HyperliquidEventMap>(
-    type: K,
-    listener: ((event: HyperliquidEventMap[K]) => void) | EventListenerObject | null,
-    options?: boolean | AddEventListenerOptions,
-  ): void;
-  removeEventListener<K extends keyof HyperliquidEventMap>(
-    type: K,
-    listener: ((event: HyperliquidEventMap[K]) => void) | EventListenerObject | null,
-    options?: boolean | EventListenerOptions,
-  ): void;
-  dispatchEvent(event: HyperliquidEventMap[keyof HyperliquidEventMap]): boolean;
 }

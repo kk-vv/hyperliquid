@@ -1,6 +1,10 @@
 import { type IRequestTransport, type ISubscriptionTransport, type Subscription, TransportError } from "../base.ts";
 import { AbortSignal_ } from "../_polyfills.ts";
-import { ReconnectingWebSocket, ReconnectingWebSocketError, type ReconnectingWebSocketOptions } from "@nktkas/rews";
+import {
+  ReconnectingWebSocket,
+  ReconnectingWebSocketError,
+  type ReconnectingWebSocketOptions,
+} from "./_reconnecting_websocket.ts";
 import { HyperliquidEventTarget } from "./_hyperliquid_event_target.ts";
 import { WebSocketAsyncRequest, WebSocketRequestError } from "./_websocket_async_request.ts";
 
@@ -12,7 +16,7 @@ type MaybePromise<T> = T | Promise<T>;
 export interface WebSocketTransportOptions {
   /**
    * Indicates this transport uses testnet endpoint.
-   * @default false
+   * @defaultValue `false`
    */
   isTestnet?: boolean;
   /**
@@ -23,26 +27,26 @@ export interface WebSocketTransportOptions {
    * - Testnet:
    *   - API: `wss://api.hyperliquid-testnet.xyz/ws`
    *   - Explorer: `wss://rpc.hyperliquid-testnet.xyz/ws`
-   * @default `wss://api.hyperliquid.xyz/ws` for mainnet, `wss://api.hyperliquid-testnet.xyz/ws` for testnet
+   * @defaultValue `wss://api.hyperliquid.xyz/ws` for mainnet, `wss://api.hyperliquid-testnet.xyz/ws` for testnet
    */
   url?: string | URL;
   /**
    * Timeout for requests in ms.
    * Set to `null` to disable.
-   * @default 10_000
+   * @defaultValue `10_000`
    */
   timeout?: number | null;
   /**
    * Interval between sending ping messages in ms.
    * Set to `null` to disable.
-   * @default 30_000
+   * @defaultValue `30_000`
    */
   keepAliveInterval?: number | null;
   /** Reconnection policy configuration for closed connections. */
   reconnect?: ReconnectingWebSocketOptions;
   /**
    * Enable automatic re-subscription to Hyperliquid subscription after reconnection.
-   * @default true
+   * @defaultValue `true`
    */
   resubscribe?: boolean;
   onRequest?: (type: string, payload: unknown) => MaybePromise<unknown | void | null | undefined>;
@@ -69,7 +73,7 @@ export class WebSocketTransport implements IRequestTransport, ISubscriptionTrans
   > = new Map();
 
   /** Indicates this transport uses testnet endpoint. */
-  readonly isTestnet: boolean;
+  isTestnet: boolean;
   /**
    * Timeout for requests in ms.
    * Set to `null` to disable.
@@ -168,7 +172,7 @@ export class WebSocketTransport implements IRequestTransport, ISubscriptionTrans
     }
   }
   protected _resubscribeStop(): void {
-    if (!this.resubscribe || this.socket.terminationSignal.aborted) {
+    if (!this.resubscribe || this.socket.terminateSignal.aborted) {
       for (const subscriptionInfo of this._subscriptions.values()) {
         for (const [_, unsubscribe] of subscriptionInfo.listeners) {
           unsubscribe(); // does not cause an error if used when the connection is closed
@@ -301,8 +305,8 @@ export class WebSocketTransport implements IRequestTransport, ISubscriptionTrans
   ready(signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const combinedSignal = signal
-        ? AbortSignal_.any([this.socket.terminationSignal, signal])
-        : this.socket.terminationSignal;
+        ? AbortSignal_.any([this.socket.terminateSignal, signal])
+        : this.socket.terminateSignal;
 
       if (combinedSignal.aborted) return reject(combinedSignal.reason);
       if (this.socket.readyState === ReconnectingWebSocket.OPEN) return resolve();
